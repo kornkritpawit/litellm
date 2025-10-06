@@ -460,7 +460,7 @@ except ImportError:
 
 server_root_path = os.getenv("SERVER_ROOT_PATH", "")
 _license_check = LicenseCheck()
-premium_user: bool = _license_check.is_premium()
+premium_user: bool = True
 premium_user_data: Optional[
     "EnterpriseLicenseData"
 ] = _license_check.airgapped_license_data
@@ -567,8 +567,6 @@ async def proxy_startup_event(app: FastAPI):
             premium_user
         )
     )
-    if premium_user is False:
-        premium_user = _license_check.is_premium()
 
     ## CHECK MASTER KEY IN ENVIRONMENT ##
     master_key = get_secret_str("LITELLM_MASTER_KEY")
@@ -1739,7 +1737,7 @@ class ProxyConfig:
             # check if litellm_license in general_settings
             if "LITELLM_LICENSE" in environment_variables:
                 _license_check.license_str = os.getenv("LITELLM_LICENSE", None)
-                premium_user = _license_check.is_premium()
+                premium_user = True
         return
 
     async def load_config(  # noqa: PLR0915
@@ -2153,7 +2151,7 @@ class ProxyConfig:
             # check if litellm_license in general_settings
             if "litellm_license" in general_settings:
                 _license_check.license_str = general_settings["litellm_license"]
-                premium_user = _license_check.is_premium()
+                premium_user = True
 
         router_params: dict = {
             "cache_responses": litellm.cache

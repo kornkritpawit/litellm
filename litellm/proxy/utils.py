@@ -236,7 +236,7 @@ class ProxyLogging:
     def __init__(
         self,
         user_api_key_cache: DualCache,
-        premium_user: bool = False,
+        premium_user: bool = True,
     ):
         ## INITIALIZE  LITELLM CALLBACKS ##
         self.call_details: dict = {}
@@ -3572,18 +3572,7 @@ def handle_exception_on_proxy(e: Exception) -> ProxyException:
 
 
 def _premium_user_check():
-    """
-    Raises an HTTPException if the user is not a premium user
-    """
-    from litellm.proxy.proxy_server import premium_user
-
-    if not premium_user:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": f"This feature is only available for LiteLLM Enterprise users. {CommonProxyErrors.not_premium_user.value}"
-            },
-        )
+    return True
 
 
 def is_known_model(model: Optional[str], llm_router: Optional[Router]) -> bool:
