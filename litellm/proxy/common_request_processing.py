@@ -680,52 +680,36 @@ class ProxyBaseLLMRequestProcessing:
         if status_code is None:
             status_code = 500
 
-        # For 429 RateLimitError, return simplified message
-        if isinstance(e, litellm.RateLimitError) or status_code == 429:
-            simplified_msg = "429 litellm.RateLimitError: RateLimitError"
-            raise ProxyException(
-                message=simplified_msg,
-                type=getattr(e, "type", "None"),
-                param=getattr(e, "param", "None"),
-                openai_code=getattr(e, "code", None),
-                code=status_code,
-                headers=headers,
-            )
-        # For other 4xx and 5xx errors, return simplified message with status code
-        elif 400 <= status_code < 600:
-            simplified_msg = f"{status_code} HTTP Error"
-            raise ProxyException(
-                message=simplified_msg,
-                type=getattr(e, "type", "None"),
-                param=getattr(e, "param", "None"),
-                openai_code=getattr(e, "code", None),
-                code=status_code,
-                headers=headers,
-            )
-
-        if isinstance(e, HTTPException):
-            raise ProxyException(
-                message=getattr(e, "detail", str(e)),
-                type=getattr(e, "type", "None"),
-                param=getattr(e, "param", "None"),
-                code=getattr(e, "status_code", status.HTTP_400_BAD_REQUEST),
-                headers=headers,
-            )
-        # Get the most descriptive error message available
-        error_msg = str(e)
-        if hasattr(e, "message") and e.message:
-            error_msg = str(e.message)
-        elif str(e).strip():
-            error_msg = str(e)
-        else:
-            error_msg = f"Unexpected error: {type(e).__name__}"
+        # Map status codes to user-friendly messages
+        # Console already has detailed error logged above (line 647-651)
+        user_friendly_messages = {
+            400: "Bad request",
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            429: "Rate limit reached",
+            500: "Upstream error",
+            502: "Upstream error",
+            503: "Upstream error",
+            504: "Upstream error",
+        }
         
+        # Get user-friendly message, default to generic error for other status codes
+        if status_code in user_friendly_messages:
+            user_message = user_friendly_messages[status_code]
+        elif 400 <= status_code < 500:
+            user_message = "Bad request"
+        elif 500 <= status_code < 600:
+            user_message = "Upstream error"
+        else:
+            user_message = "Upstream error"
+            
         raise ProxyException(
-            message=error_msg,
+            message=user_message,
             type=getattr(e, "type", "None"),
             param=getattr(e, "param", "None"),
             openai_code=getattr(e, "code", None),
-            code=getattr(e, "status_code", 500),
+            code=status_code,
             headers=headers,
         )
 
@@ -814,15 +798,45 @@ class ProxyBaseLLMRequestProcessing:
 
             if isinstance(e, HTTPException):
                 raise e
+            
+            # Get status code from exception
+            status_code = getattr(e, "status_code", None)
+            if status_code is None and hasattr(e, "code"):
+                try:
+                    status_code = int(getattr(e, "code", 0))
+                except (ValueError, TypeError):
+                    status_code = 500
+            if status_code is None:
+                status_code = 500
+
+            # Map status codes to user-friendly messages (same as non-streaming)
+            user_friendly_messages = {
+                400: "Bad request",
+                401: "Unauthorized",
+                403: "Forbidden",
+                404: "Not Found",
+                429: "Rate limit reached",
+                500: "Upstream error",
+                502: "Upstream error",
+                503: "Upstream error",
+                504: "Upstream error",
+            }
+            
+            # Get user-friendly message
+            if status_code in user_friendly_messages:
+                user_message = user_friendly_messages[status_code]
+            elif 400 <= status_code < 500:
+                user_message = "Bad request"
+            elif 500 <= status_code < 600:
+                user_message = "Upstream error"
             else:
-                error_traceback = traceback.format_exc()
-                error_msg = f"{str(e)}\n\n{error_traceback}"
+                user_message = "Upstream error"
 
             proxy_exception = ProxyException(
-                message=getattr(e, "message", error_msg),
+                message=user_message,
                 type=getattr(e, "type", "None"),
                 param=getattr(e, "param", "None"),
-                code=getattr(e, "status_code", 500),
+                code=status_code,
             )
             error_returned = json.dumps({"error": proxy_exception.to_dict()})
             yield f"{STREAM_SSE_DATA_PREFIX}{error_returned}\n\n"

@@ -3555,19 +3555,72 @@ def handle_exception_on_proxy(e: Exception) -> ProxyException:
     verbose_proxy_logger.exception(f"Exception: {e}")
 
     if isinstance(e, HTTPException):
+        # Get status code
+        status_code = getattr(e, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Map status codes to user-friendly messages
+        user_friendly_messages = {
+            400: "Bad request",
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            429: "Rate limit reached",
+            500: "Upstream error",
+            502: "Upstream error",
+            503: "Upstream error",
+            504: "Upstream error",
+        }
+        
+        # Get user-friendly message
+        if status_code in user_friendly_messages:
+            user_message = user_friendly_messages[status_code]
+        elif 400 <= status_code < 500:
+            user_message = "Bad request"
+        elif 500 <= status_code < 600:
+            user_message = "Upstream error"
+        else:
+            user_message = "Upstream error"
+            
         return ProxyException(
-            message=getattr(e, "detail", f"error({str(e)})"),
+            message=user_message,
             type=ProxyErrorTypes.internal_server_error,
             param=getattr(e, "param", "None"),
-            code=getattr(e, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR),
+            code=status_code,
         )
     elif isinstance(e, ProxyException):
         return e
+    
+    # For other exceptions, get status code
+    status_code = getattr(e, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    # Map status codes to user-friendly messages
+    user_friendly_messages = {
+        400: "Bad request",
+        401: "Unauthorized",
+        403: "Forbidden",
+        404: "Not Found",
+        429: "Rate limit reached",
+        500: "Upstream error",
+        502: "Upstream error",
+        503: "Upstream error",
+        504: "Upstream error",
+    }
+    
+    # Get user-friendly message
+    if status_code in user_friendly_messages:
+        user_message = user_friendly_messages[status_code]
+    elif 400 <= status_code < 500:
+        user_message = "Bad request"
+    elif 500 <= status_code < 600:
+        user_message = "Upstream error"
+    else:
+        user_message = "Upstream error"
+        
     return ProxyException(
-        message="Internal Server Error, " + str(e),
+        message=user_message,
         type=ProxyErrorTypes.internal_server_error,
         param=getattr(e, "param", "None"),
-        code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        code=status_code,
     )
 
 

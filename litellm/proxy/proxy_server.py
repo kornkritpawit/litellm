@@ -3521,17 +3521,45 @@ async def async_data_generator(
 
         if isinstance(e, HTTPException):
             raise e
-        elif isinstance(e, StreamingCallbackError):
-            error_msg = str(e)
+        
+        # Get status code from exception
+        status_code = getattr(e, "status_code", None)
+        if status_code is None and hasattr(e, "code"):
+            try:
+                status_code = int(getattr(e, "code", 0))
+            except (ValueError, TypeError):
+                status_code = 500
+        if status_code is None:
+            status_code = 500
+
+        # Map status codes to user-friendly messages
+        user_friendly_messages = {
+            400: "Bad request",
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            429: "Rate limit reached",
+            500: "Upstream error",
+            502: "Upstream error",
+            503: "Upstream error",
+            504: "Upstream error",
+        }
+        
+        # Get user-friendly message
+        if status_code in user_friendly_messages:
+            user_message = user_friendly_messages[status_code]
+        elif 400 <= status_code < 500:
+            user_message = "Bad request"
+        elif 500 <= status_code < 600:
+            user_message = "Upstream error"
         else:
-            error_traceback = traceback.format_exc()
-            error_msg = f"{str(e)}\n\n{error_traceback}"
+            user_message = "Upstream error"
 
         proxy_exception = ProxyException(
-            message=getattr(e, "message", error_msg),
+            message=user_message,
             type=getattr(e, "type", "None"),
             param=getattr(e, "param", "None"),
-            code=getattr(e, "status_code", 500),
+            code=status_code,
         )
         error_returned = json.dumps({"error": proxy_exception.to_dict()})
         yield f"data: {error_returned}\n\n"
